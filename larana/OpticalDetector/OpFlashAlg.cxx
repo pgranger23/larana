@@ -31,6 +31,11 @@
 
 namespace opdet {
 
+  // Smallest flash TimeWidth [us] that may be treated as the parent of late light.
+  // Comfortably below any real flash (5th percentile of reconstructed widths is ~0.06 us)
+  // and far above the ~1e-14 us floating-point residue that triggers the pathology below.
+  constexpr double kMinParentFlashWidth = 1.0e-3;
+
   //----------------------------------------------------------------------------
   void writeHistogram(std::vector<double> const& binned)
   {
@@ -596,9 +601,25 @@ namespace opdet {
   {
     if (iTime > jTime) return 1e6;
 
+    // iWidth sits in a denominator below. ConstructFlash derives TimeWidth from hit PEAK
+    // TIMES only, so a flash built from a single hit -- or from hits sharing a peak time --
+    // gets a width of zero or of a few 1e-14 us. The latter inflates HypPE by ~12 orders
+    // of magnitude, so an arbitrarily faint earlier flash "explains" an arbitrarily bright
+    // later one and deletes it. Observed in DUNE FD atmospheric samples: a 3.9 PE
+    // radiological flash of width 6.6e-14 us deleted a 23,211 PE neutrino flash 19.6 us
+    // later, and with it every other flash for ~35 us.
+    //
+    // A width of EXACTLY zero was harmless only by accident: it gives HypPE = inf, hence
+    // nsigma = NaN, and "NaN < threshold" is false. Reject both cases explicitly.
+    if (!(iWidth > kMinParentFlashWidth)) return 1e6;
+
     // Calculate hypothetical PE if this were actually a late flash from i.
     // Argon time const is 1600 ns, so 1.6.
     double HypPE = iPE * jWidth / iWidth * std::exp(-(jTime - iTime) / 1.6);
+
+    // Late light from i cannot carry more photoelectrons than i itself.
+    if (HypPE > iPE) HypPE = iPE;
+
     double nsigma = (jPE - HypPE) / std::sqrt(HypPE);
     return nsigma;
   }
@@ -609,6 +630,10 @@ namespace opdet {
                              std::vector<bool>& MarkedForRemoval)
   {
     for (size_t iFlash = BeginFlash; iFlash != FlashVector.size(); ++iFlash) {
+
+      // A flash that is itself being discarded should not be used to justify discarding
+      // later ones.
+      if (MarkedForRemoval.at(iFlash - BeginFlash)) continue;
 
       double iTime = FlashVector.at(iFlash).Time();
       double iPE = FlashVector.at(iFlash).TotalPE();
