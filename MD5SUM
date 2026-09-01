@@ -1,1 +1,4 @@
 fadf73bfaaf3ae8bec50647cd2c8bdaf  liblarana_OpticalDetector.so
+9da4fb39c8af50d652ce88047d0e248a  full_reflash.fcl
+d547a5ad308169594285e3d214fbe6e8  pds_extractor_reflash.py
+515cdc2c168572bae981d7a73899d681  pilot_summary.py
