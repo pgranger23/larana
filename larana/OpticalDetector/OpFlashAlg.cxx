@@ -31,11 +31,6 @@
 
 namespace opdet {
 
-  // Smallest flash TimeWidth [us] that may be treated as the parent of late light.
-  // Comfortably below any real flash (5th percentile of reconstructed widths is ~0.06 us)
-  // and far above the ~1e-14 us floating-point residue that triggers the pathology below.
-  constexpr double kMinParentFlashWidth = 1.0e-3;
-
   //----------------------------------------------------------------------------
   void writeHistogram(std::vector<double> const& binned)
   {
@@ -72,7 +67,8 @@ namespace opdet {
                       float const FlashThreshold,
                       float const WidthTolerance,
                       detinfo::DetectorClocksData const& ClocksData,
-                      float const TrigCoinc)
+                      float const TrigCoinc,
+                      double const MinParentFlashWidth)
   {
     // Initial size for accumulators - will be automatically extended if needed
     int initialsize = 6400;
@@ -159,7 +155,7 @@ namespace opdet {
       ConstructFlash(
         HitsPerFlashVec, HitVector, FlashVector, geom, wireReadoutGeom, ClocksData, TrigCoinc);
 
-    RemoveLateLight(FlashVector, RefinedHitsPerFlash);
+    RemoveLateLight(FlashVector, RefinedHitsPerFlash, MinParentFlashWidth);
 
     //checkOnBeamFlash(FlashVector);
 
@@ -597,7 +593,8 @@ namespace opdet {
                                 double const iWidth,
                                 double const jPE,
                                 double const jTime,
-                                double const jWidth)
+                                double const jWidth,
+                                double const MinParentFlashWidth)
   {
     if (iTime > jTime) return 1e6;
 
@@ -611,7 +608,7 @@ namespace opdet {
     //
     // A width of EXACTLY zero was harmless only by accident: it gives HypPE = inf, hence
     // nsigma = NaN, and "NaN < threshold" is false. Reject both cases explicitly.
-    if (!(iWidth > kMinParentFlashWidth)) return 1e6;
+    if (!(iWidth > MinParentFlashWidth)) return 1e6;
 
     // Calculate hypothetical PE if this were actually a late flash from i.
     // Argon time const is 1600 ns, so 1.6.
@@ -627,7 +624,8 @@ namespace opdet {
   //----------------------------------------------------------------------------
   void MarkFlashesForRemoval(std::vector<recob::OpFlash> const& FlashVector,
                              size_t const BeginFlash,
-                             std::vector<bool>& MarkedForRemoval)
+                             std::vector<bool>& MarkedForRemoval,
+                             double const MinParentFlashWidth)
   {
     for (size_t iFlash = BeginFlash; iFlash != FlashVector.size(); ++iFlash) {
 
@@ -649,7 +647,8 @@ namespace opdet {
 
         // If smaller than, or within 2sigma of expectation,
         // attribute to late light and toss out
-        if (GetLikelihoodLateLight(iPE, iTime, iWidth, jPE, jTime, jWidth) < 3.0)
+        if (GetLikelihoodLateLight(iPE, iTime, iWidth, jPE, jTime, jWidth,
+                                   MinParentFlashWidth) < 3.0)
           MarkedForRemoval.at(jFlash - BeginFlash) = true;
       }
     }
@@ -670,7 +669,8 @@ namespace opdet {
 
   //----------------------------------------------------------------------------
   void RemoveLateLight(std::vector<recob::OpFlash>& FlashVector,
-                       std::vector<std::vector<int>>& RefinedHitsPerFlash)
+                       std::vector<std::vector<int>>& RefinedHitsPerFlash,
+                       double const MinParentFlashWidth)
   {
     std::vector<bool> MarkedForRemoval(RefinedHitsPerFlash.size(), false);
 
@@ -686,7 +686,7 @@ namespace opdet {
 
     std::sort(FlashVector.begin() + BeginFlash, FlashVector.end(), sort_flash_by_time);
 
-    MarkFlashesForRemoval(FlashVector, BeginFlash, MarkedForRemoval);
+    MarkFlashesForRemoval(FlashVector, BeginFlash, MarkedForRemoval, MinParentFlashWidth);
 
     RemoveFlashesFromVectors(MarkedForRemoval, FlashVector, BeginFlash, RefinedHitsPerFlash);
 
