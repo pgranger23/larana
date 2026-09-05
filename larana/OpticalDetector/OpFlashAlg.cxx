@@ -647,8 +647,8 @@ namespace opdet {
 
         // If smaller than, or within 2sigma of expectation,
         // attribute to late light and toss out
-        if (GetLikelihoodLateLight(iPE, iTime, iWidth, jPE, jTime, jWidth,
-                                   MinParentFlashWidth) < 3.0)
+        if (GetLikelihoodLateLight(iPE, iTime, iWidth, jPE, jTime, jWidth, MinParentFlashWidth) <
+            3.0)
           MarkedForRemoval.at(jFlash - BeginFlash) = true;
       }
     }

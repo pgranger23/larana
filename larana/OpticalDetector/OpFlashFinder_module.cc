@@ -79,8 +79,7 @@ namespace opdet {
     // light. TimeWidth appears in a denominator in GetLikelihoodLateLight, so a flash
     // built from a single hit -- or from hits sharing a peak time -- would otherwise
     // delete every flash behind it. Set to 0 to disable the guard.
-    fMinParentFlashWidth = pset.get<double>("MinParentFlashWidth",
-                                            kDefaultMinParentFlashWidth);
+    fMinParentFlashWidth = pset.get<double>("MinParentFlashWidth", kDefaultMinParentFlashWidth);
 
     produces<std::vector<recob::OpFlash>>();
     produces<art::Assns<recob::OpFlash, recob::OpHit>>();
