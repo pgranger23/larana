@@ -1,0 +1,37 @@
+# Atmospheric nu_e CC (20-100 MeV) + radiological backgrounds, DUNE FD HD 1x2x6.
+#
+# Reconstruction of the production gen FCL used for justIN w18643
+# (prodgenie_atmnu_max_weighted_randompolicy_radiological_decay0_dune10kt_1x2x6.fcl),
+# whose CVMFS upload has since been purged, with three changes:
+#   1. energy window   0.1-100 GeV  ->  0.02-0.10 GeV
+#   2. EventGeneratorList "Default" -> "CC"  (below m_mu only nu_e can go CC)
+#   3. flux files      cvmfs.osgstorage -> shipped copies extended down to 20 MeV
+#
+# The Honda tables stop at 94.4 MeV; GENIE's atmo driver calls TH3::Interpolate at the
+# sampled energy and ROOT throws outside the domain, so the histogram has to be extended
+# or the job dies at beginJob with zero events. Generation is power-law (index 2.5), so
+# the extension only affects the flux WEIGHT -- which is NOT physical below 94.4 MeV and
+# must be recomputed before any rate statement.
+#
+# __FLUXDIR__ is substituted by the jobscript with the worker's payload directory.
+#include "workflow_radiological_decay0_dune10kt.fcl"
+#include "prodgenie_atmnu_max_weighted_randompolicy_dune10kt_1x2x6.fcl"
+
+outputs.out1.fileName: "atmnuCC_lowE_radio_gen.root"
+
+physics:
+{
+  @table::physics
+  producers:
+  {
+    @table::dunefd_horizdrift_1x2x6_producers
+    generator: @local::dune_fd_genie_atmo_max_weighted_honda
+    rns: { module_type: "RandomNumberSaver" }
+  }
+  simulate: [ rns, generator, @sequence::dunefd_hd_backgrounds_1x2x6 ]
+}
+
+physics.producers.generator.AtmoEmin:            0.02
+physics.producers.generator.AtmoEmax:            0.10
+physics.producers.generator.EventGeneratorList:  "CC"
+physics.producers.generator.FluxSearchPaths:     "__FLUXDIR__"
